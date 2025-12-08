@@ -1,0 +1,260 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>분리형 노후 자금 시뮬레이터</title>
+    <style>
+        body { font-family: 'Pretendard', sans-serif; background-color: #f4f6f8; color: #333; margin: 0; padding: 20px; }
+        .container { max-width: 900px; margin: 0 auto; background: white; padding: 30px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); }
+        h1 { text-align: center; color: #2c3e50; margin-bottom: 30px; font-size: 26px; }
+        
+        /* 섹션 구분 스타일 */
+        .calculator-section { margin-top: 40px; padding: 20px; border: 1px solid #ddd; border-radius: 10px; }
+        .acc-calc { background-color: #e8f5e9; border-left: 5px solid #4caf50; } /* 녹색 테마 */
+        .wd-calc { background-color: #e3f2fd; border-left: 5px solid #2196f3; }  /* 파랑 테마 */
+
+        h2 { font-size: 22px; margin-top: 0; padding-bottom: 5px; border-bottom: 2px solid; }
+        .acc-calc h2 { border-bottom-color: #4caf50; color: #4caf50; }
+        .wd-calc h2 { border-bottom-color: #2196f3; color: #2196f3; }
+        
+        .input-group { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; margin-bottom: 20px; }
+        .input-item { display: flex; flex-direction: column; }
+        label { margin-bottom: 5px; font-weight: 600; font-size: 14px; color: #555; }
+        input { padding: 10px; border: 1px solid #ddd; border-radius: 6px; font-size: 16px; outline: none; transition: 0.3s; }
+        
+        button { width: 100%; padding: 12px; color: white; border: none; border-radius: 6px; font-size: 16px; font-weight: bold; cursor: pointer; transition: 0.3s; margin-top: 15px; }
+        .acc-calc button { background-color: #4caf50; }
+        .acc-calc button:hover { background-color: #388e3c; }
+        .wd-calc button { background-color: #2196f3; }
+        .wd-calc button:hover { background-color: #1565c0; }
+
+
+        .result-section { margin-top: 20px; padding: 15px; background-color: white; border-radius: 8px; border: 1px solid #ccc;}
+        .result-row { display: flex; justify-content: space-between; margin-bottom: 8px; padding-bottom: 5px; border-bottom: 1px dashed #eee; }
+        .result-row:last-child { border-bottom: none; }
+        .result-label { font-weight: 600; color: #555; }
+        .result-value { font-weight: bold; font-size: 17px; }
+        .highlight-green { color: #4caf50; }
+        .highlight-blue { color: #2196f3; }
+        
+        @media (max-width: 768px) { .input-group { grid-template-columns: 1fr 1fr; } }
+        @media (max-width: 480px) { .input-group { grid-template-columns: 1fr; } }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h1>노후 자금 분리형 시뮬레이터</h1>
+
+    <div class="calculator-section acc-calc">
+        <h2>① 자금 축적 단계 (납입 및 거치)</h2>
+        <div class="input-group">
+            <div class="input-item">
+                <label>초기 씨드머니 (원)</label>
+                <input type="number" id="acc_seed" value="10000000">
+            </div>
+            <div class="input-item">
+                <label>월 납입 금액 (원)</label>
+                <input type="number" id="acc_monthly" value="500000">
+            </div>
+            <div class="input-item">
+                <label>연 수익률 (%)</label>
+                <input type="number" id="acc_return" value="8" step="0.1">
+            </div>
+            <div class="input-item">
+                <label>납입 기간 (년)</label>
+                <input type="number" id="acc_contribY" value="20">
+            </div>
+            <div class="input-item">
+                <label>거치 기간 (납입 후 대기, 년)</label>
+                <input type="number" id="acc_deferralY" value="5">
+            </div>
+            <div class="input-item">
+                <label>임금 상승률 (매년, %)</label>
+                <input type="number" id="acc_wage" value="3" step="0.1">
+            </div>
+            <div class="input-item">
+                <label>연 물가상승률 (%)</label>
+                <input type="number" id="acc_inflation" value="2.3" step="0.1">
+            </div>
+        </div>
+        <button onclick="calculateAccumulation()">① 축적 자산 계산하기</button>
+
+        <div class="result-section" id="accResultSection" style="display:none;">
+            <div class="result-row">
+                <span class="result-label">인출 시작 시점의 최종 자산 (명목 가치)</span>
+                <span class="result-value highlight-green" id="res_finalBalance">0 원</span>
+            </div>
+            <div class="result-row">
+                <span class="result-label">인출 시작 시점의 최종 자산 (실질 가치, 현재 구매력)</span>
+                <span class="result-value highlight-green" id="res_finalReal">0 원</span>
+            </div>
+        </div>
+    </div>
+    
+    <div class="calculator-section wd-calc">
+        <h2>② 자금 인출 단계 (균등 출금 전략)</h2>
+        <div class="input-group">
+            <div class="input-item">
+                <label>인출 시작 시점의 현재 금액 (원)</label>
+                <input type="number" id="wd_startBalance" placeholder="① 계산 결과를 입력하세요" value="500000000">
+            </div>
+            <div class="input-item">
+                <label>연 수익률 (%)</label>
+                <input type="number" id="wd_return" value="7" step="0.1">
+            </div>
+            <div class="input-item">
+                <label>물가상승률 (%)</label>
+                <input type="number" id="wd_inflation" value="2.3" step="0.1">
+            </div>
+            <div class="input-item">
+                <label>총 출금 전략 기간 (년)</label>
+                <input type="number" id="wd_totalY" value="30">
+            </div>
+            <div class="input-item">
+                <label>기준 시점 (경과 기간, 년)</label>
+                <input type="number" id="wd_refY" value="10">
+            </div>
+        </div>
+        <button onclick="calculateWithdrawal()">② 출금 전략 계산하기</button>
+
+        <div class="result-section" id="wdResultSection" style="display:none;">
+            <div class="result-row">
+                <span class="result-label">연 출금액 (원)</span>
+                <span class="result-value" id="res_annualW">0 원</span>
+            </div>
+            <div class="result-row">
+                <span class="result-label">월 출금액 (원)</span>
+                <span class="result-value" id="res_monthlyW">0 원</span>
+            </div>
+            <div class="result-row">
+                <span class="result-label">연 인출률 (%)</span>
+                <span class="result-value" id="res_rateW">0.00 %</span>
+            </div>
+            <div class="result-row">
+                <span class="result-label">기준 시점의 잔액 (명목 가치)</span>
+                <span class="result-value" id="res_nominalB">0 원</span>
+            </div>
+            <div class="result-row">
+                <span class="result-label">기준 시점의 잔액 (실질 가치, 인출 시작 시점 구매력)</span>
+                <span class="result-value highlight-blue" id="res_realB">0 원</span>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    // ----------------------------------------------------
+    // 재무 계산 공통 함수
+    // ----------------------------------------------------
+    function formatNumber(num) {
+        // 음수일 경우 '-' 부호를 제외하고 포맷팅 후 다시 붙여줌
+        const sign = num < 0 ? "-" : "";
+        const absoluteNum = Math.abs(Math.floor(num));
+        return sign + absoluteNum.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+    }
+
+    // 엑셀 PMT 함수: 잔액 0을 위한 균등 인출액 계산
+    function financialPMT(rate, nper, pv) {
+        if (rate === 0) return pv / nper;
+        // pv는 양수로 들어와야 금융 함수 공식상 인출액이 양수로 반환됨
+        return rate * pv * Math.pow(1 + rate, nper) / (Math.pow(1 + rate, nper) - 1);
+    }
+
+    // 엑셀 PV 함수: 남은 기간 동안의 정기 인출액을 현재 시점의 잔액으로 환산
+    function financialPV(rate, nper, pmt) {
+        if (rate === 0) return pmt * nper;
+        // pmt를 음수로 받으면 (유출) 잔액이 양수로 나오도록 계산
+        return (-pmt / rate) * (1 - Math.pow(1 + rate, -nper)); 
+    }
+
+    // ----------------------------------------------------
+    // ① 자금 축적 단계 계산 함수
+    // ----------------------------------------------------
+    function calculateAccumulation() {
+        const seed = parseFloat(document.getElementById('acc_seed').value);
+        let monthly = parseFloat(document.getElementById('acc_monthly').value); // 임금 상승 반영을 위해 let 사용
+        const wageRate = parseFloat(document.getElementById('acc_wage').value) / 100;
+        const annualReturn = parseFloat(document.getElementById('acc_return').value) / 100;
+        const contribY = parseInt(document.getElementById('acc_contribY').value);
+        const deferralY = parseInt(document.getElementById('acc_deferralY').value);
+        const inflationRate = parseFloat(document.getElementById('acc_inflation').value) / 100;
+        
+        const R_monthly = annualReturn / 12; // 월 수익률
+        let finalBalance = seed; 
+
+        // 1. 납입 기간 동안 계산 (임금 상승률 반영)
+        for (let y = 1; y <= contribY; y++) {
+            for (let m = 1; m <= 12; m++) {
+                finalBalance = finalBalance * (1 + R_monthly) + monthly;
+            }
+            // 매년 월 납입액에 임금 상승률 적용
+            monthly = monthly * (1 + wageRate);
+        }
+
+        // 2. 거치 기간 동안 계산
+        for (let y = 1; y <= deferralY; y++) {
+            for (let m = 1; m <= 12; m++) {
+                finalBalance = finalBalance * (1 + R_monthly);
+            }
+        }
+        
+        // 3. 실질 가치 계산
+        const totalTime = contribY + deferralY;
+        const inflationFactor = Math.pow(1 + inflationRate, totalTime);
+        const realBalance = finalBalance / inflationFactor;
+
+        // 4. 결과 출력
+        document.getElementById('accResultSection').style.display = 'block';
+        document.getElementById('res_finalBalance').innerText = formatNumber(finalBalance) + " 원";
+        document.getElementById('res_finalReal').innerText = formatNumber(realBalance) + " 원";
+    }
+
+    // ----------------------------------------------------
+    // ② 자금 인출 단계 계산 함수
+    // ----------------------------------------------------
+    function calculateWithdrawal() {
+        const startBalance = parseFloat(document.getElementById('wd_startBalance').value);
+        const annualReturn = parseFloat(document.getElementById('wd_return').value) / 100;
+        const inflationRate = parseFloat(document.getElementById('wd_inflation').value) / 100;
+        const totalY = parseInt(document.getElementById('wd_totalY').value);
+        const refY = parseInt(document.getElementById('wd_refY').value);
+
+        // 유효성 검사
+        if (refY > totalY) {
+            alert("기준 시점(경과 기간)은 총 출금 전략 기간보다 클 수 없습니다.");
+            return;
+        }
+
+        // 1. 연 출금액 (PMT) 계산
+        const annualWithdrawal = financialPMT(annualReturn, totalY, startBalance);
+
+        // 2. 월 출금액
+        const monthlyWithdrawal = annualWithdrawal / 12;
+
+        // 3. 연 인출률 (%)
+        const withdrawalRate = (annualWithdrawal / startBalance) * 100;
+
+        // 4. 기준 시점의 잔액 (명목 가치)
+        const remainingYears = totalY - refY;
+        // pmt를 음수로 전달하여 잔액이 양수로 나오게 함
+        const nominalBalance = financialPV(annualReturn, remainingYears, -annualWithdrawal); 
+
+        // 5. 기준 시점의 잔액 (실질 가치)
+        // 인출 시작 시점(Year 0)의 구매력으로 환산 (경과 기간 refY만 반영)
+        const inflationFactor = Math.pow(1 + inflationRate, refY);
+        const realBalance = nominalBalance / inflationFactor;
+
+        // 6. 결과 출력
+        document.getElementById('wdResultSection').style.display = 'block';
+        document.getElementById('res_annualW').innerText = formatNumber(annualWithdrawal) + " 원";
+        document.getElementById('res_monthlyW').innerText = formatNumber(monthlyWithdrawal) + " 원";
+        document.getElementById('res_rateW').innerText = withdrawalRate.toFixed(2) + " %";
+        document.getElementById('res_nominalB').innerText = formatNumber(nominalBalance) + " 원";
+        document.getElementById('res_realB').innerText = formatNumber(realBalance) + " 원";
+    }
+</script>
+
+</body>
+</html>
